@@ -1,4 +1,4 @@
-package com.example.applicationservice;
+package com.beaconfire.applicationservice;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
