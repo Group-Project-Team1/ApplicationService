@@ -10,7 +10,7 @@ import javax.persistence.*;
 @AllArgsConstructor
 @Entity
 @ToString
-@Table(name = "digital_document")
+@Table(name = "digital_document", schema = "ApplicationService")
 public class DigitalDocument {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -20,10 +20,10 @@ public class DigitalDocument {
     @Column(name = "is_required", nullable = false)
     private boolean isRequired;
 
-    @Column(name = "type", length = 40, nullable = false)
+    @Column(name = "type", length = 100, nullable = false)
     private String type;
 
-    @Column(name = "title", length = 40, nullable = false)
+    @Column(name = "title", length = 100, nullable = false)
     private String title;
 
     @Column(name = "path", length = 100)

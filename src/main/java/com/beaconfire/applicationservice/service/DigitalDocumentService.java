@@ -1,36 +1,53 @@
 package com.beaconfire.applicationservice.service;
 
+import cn.hutool.core.date.DateTime;
+import cn.hutool.core.date.DateUtil;
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
+import com.amazonaws.HttpMethod;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.*;
 import com.amazonaws.util.IOUtils;
 import com.beaconfire.applicationservice.dao.DigitalDocumentDAO;
+import com.beaconfire.applicationservice.domain.entity.DigitalDocument;
+import com.beaconfire.applicationservice.domain.entity.Employee;
+import com.beaconfire.applicationservice.domain.entity.PersonalDocument;
+import com.beaconfire.applicationservice.repo.EmployeeRepo;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
 
 import java.io.*;
 import java.net.URL;
 import java.nio.file.Files;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.Date;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.springframework.web.multipart.MultipartFile;
+
+import javax.transaction.Transactional;
 
 @Service
 public class DigitalDocumentService {
 
     private DigitalDocumentDAO digitalDocumentDAO;
-
+    private final EmployeeRepo repository;
     private static final Logger log = LoggerFactory.getLogger(DigitalDocumentService.class);
     @Autowired
     private AmazonS3 amazonS3;
     @Value("${aws.s3.bucket}")
     private String s3BucketName;
 
+
+    @Autowired
+    public DigitalDocumentService(EmployeeRepo repository) {
+        this.repository = repository;
+    }
 
     @Autowired
     public void setDigitalDocumentDAO(DigitalDocumentDAO digitalDocumentDAO) {
@@ -74,7 +91,6 @@ public class DigitalDocumentService {
         }
     }
 
-
     /**
      * download file
      * @param fileName
@@ -106,7 +122,48 @@ public class DigitalDocumentService {
         System.out.println(url);
     }
 
+    public URL getFileUrl(String fileName){
+        DateTime expiration = DateUtil.offsetHour(new Date(), 1);
+        URL url = amazonS3.generatePresignedUrl(new GeneratePresignedUrlRequest(s3BucketName, fileName).withExpiration(expiration).withMethod(HttpMethod.GET));
+        return url;
+    }
 
+
+    public void updatePersonalDocuments(Integer employeeId, MultipartFile file, String fileTitle){
+        PersonalDocument personalDocument = new PersonalDocument();
+        String fileName = file.getOriginalFilename();
+        URL url = getFileUrl(fileName);
+        personalDocument.setTitle(fileTitle);
+        personalDocument.setPath(url.toString());
+        personalDocument.setCreateDate(Timestamp.valueOf(LocalDateTime.now()));
+
+        Employee employee = repository.findEmployeeByUserId(employeeId).get(0);
+        List<PersonalDocument> personalDocumentList = employee.getPersonalDocuments();
+        personalDocumentList.add(personalDocument);
+        employee.setPersonalDocuments(personalDocumentList);
+        repository.save(employee);
+    }
+
+    //    @Transactional
+//    public List<DigitalDocument> getDocuments(ApplicationFormRequest applicationFormRequest){
+//        List<DigitalDocument> results = new ArrayList<>();
+//        if(!applicationFormRequest.getIsCitizenOrGreenCard()){
+//            String visaType = applicationFormRequest.getVisaStatus().getVisaType();
+//
+//            // document with smaller id should be uploaded before document with larger id
+//            results = digitalDocumentDAO.getDocumentsByType(visaType).stream().sorted(Comparator.comparingInt(DigitalDocument::getId)).collect(Collectors.toList());
+//        }
+//        return results;
+//    }
+
+    /**
+     * get all digital documents
+     * @return
+     */
+    @Transactional
+    public List<DigitalDocument> getDocuments(){
+        return digitalDocumentDAO.getDocuments();
+    }
 
 
 }

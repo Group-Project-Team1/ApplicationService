@@ -12,7 +12,7 @@ import java.sql.Timestamp;
 @AllArgsConstructor
 @Entity
 @ToString
-@Table(name = "application_workflow")
+@Table(name = "application_workflow", schema = "ApplicationService")
 public class ApplicationWorkFlow {
 
     @Id
