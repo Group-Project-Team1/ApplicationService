@@ -66,7 +66,7 @@ public class HibernateProperty {
         this.username = awsSecrets.getUsername();
         this.password = awsSecrets.getPassword();
         // jdbc:mysql://team1-hrwebsite-database.cobx6uz1hjmg.us-east-2.rds.amazonaws.com:3306/ApplicationService?useSSL=false
-        this.url = "jdbc:" + awsSecrets.getEngine() + "://" + awsSecrets.getHost() + ":" + awsSecrets.getPort() + "/HousingService?useSSL=false";
+        this.url = "jdbc:" + awsSecrets.getEngine() + "://" + awsSecrets.getHost() + ":" + awsSecrets.getPort() + "/ApplicationService?useSSL=false";
     }
 
     public String getUrl() {
