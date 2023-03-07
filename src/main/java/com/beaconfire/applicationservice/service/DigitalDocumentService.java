@@ -75,11 +75,12 @@ public class DigitalDocumentService {
      * @param multipartFile
      * @return
      */
-    public void uploadFile(MultipartFile multipartFile) {
+    public String uploadFile(MultipartFile multipartFile) {
+        String fileName = "";
         try {
             File file = convertMultiPartFileToFile(multipartFile);
-//            String fileName = LocalDateTime.now() + "_" + file.getName();
-            String fileName = file.getName();
+            fileName = LocalDateTime.now() + "_" + file.getName();
+
             log.info("Uploading file with name {}", fileName);
             PutObjectRequest putObjectRequest = new PutObjectRequest(s3BucketName, fileName, file);
             amazonS3.putObject(putObjectRequest);
@@ -89,6 +90,7 @@ public class DigitalDocumentService {
         } catch (IOException ex) {
             log.error("Error {} occurred while deleting temporary file", ex.getLocalizedMessage());
         }
+        return fileName;
     }
 
     /**
@@ -129,9 +131,8 @@ public class DigitalDocumentService {
     }
 
 
-    public void updatePersonalDocuments(Integer employeeId, MultipartFile file, String fileTitle){
+    public void updatePersonalDocuments(Integer employeeId, String fileName, String fileTitle){
         PersonalDocument personalDocument = new PersonalDocument();
-        String fileName = file.getOriginalFilename();
         URL url = getFileUrl(fileName);
         personalDocument.setTitle(fileTitle);
         personalDocument.setPath(url.toString());
