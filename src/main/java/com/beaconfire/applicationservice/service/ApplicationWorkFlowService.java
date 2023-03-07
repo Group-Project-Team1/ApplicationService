@@ -22,11 +22,10 @@ public class ApplicationWorkFlowService {
 
     private ApplicationWorkFlowDAO applicationWorkFlowDAO;
     private final EmployeeRepo repository;
-    private final DigitalDocumentService digitalDocumentService;
+
     @Autowired
     public ApplicationWorkFlowService(EmployeeRepo repository, DigitalDocumentService digitalDocumentService) {
         this.repository = repository;
-        this.digitalDocumentService = digitalDocumentService;
     }
     @Autowired
     public void setApplicationWorkFlowDAO(ApplicationWorkFlowDAO applicationWorkFlowDAO) {
@@ -41,14 +40,15 @@ public class ApplicationWorkFlowService {
         /* insert a new employee in mongoDB
             email? insert in AuthenticationService or here?
          */
-        Employee employee = new Employee();
-        employee.setUserId(employeeId);
-        repository.save(employee);
+        if(repository.findEmployeeByUserId(employeeId).size() == 0) {
+            Employee employee = new Employee();
+            employee.setUserId(employeeId);
+            repository.save(employee);
+        }
     }
 
-    public void updateApplicationForm(Integer employeeId, ApplicationFormRequest applicationFormRequest /*MultipartFile driverLicense, MultipartFile OPTReceipt*/){
+    public void updateApplicationForm(Integer employeeId, ApplicationFormRequest applicationFormRequest){
 
-        // update employee info in mongoDB
         Employee employee = repository.findEmployeeByUserId(employeeId).get(0);
         employee.setFirstName(applicationFormRequest.getFirstName());
         employee.setLastName(applicationFormRequest.getLastName());
@@ -67,9 +67,9 @@ public class ApplicationWorkFlowService {
         employee.setReference(applicationFormRequest.getReference());
         employee.setContacts(applicationFormRequest.getContacts());
 
-
         repository.save(employee);
     }
+
 
     /* use when employee submit their entire application
        change application status from "never submitted" to "pending"

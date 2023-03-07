@@ -1,6 +1,8 @@
 package com.beaconfire.applicationservice.dao;
 
+import com.beaconfire.applicationservice.domain.entity.VisaDocumentStatus;
 import com.beaconfire.applicationservice.domain.entity.ApplicationWorkFlow;
+
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -122,10 +124,11 @@ public class ApplicationWorkFlowDAO {
             ApplicationWorkFlow applicationWorkFlow = session.get(ApplicationWorkFlow.class, applicationId);
             applicationWorkFlow.setStatus("rejected");
             applicationWorkFlow.setComment(feedback);
-            session.update(applicationId);
+            session.update(applicationWorkFlow);
         }catch (Exception e){
             e.printStackTrace();
         }
     }
+
 
 }

@@ -3,14 +3,17 @@ package com.beaconfire.applicationservice.controller;
 import com.beaconfire.applicationservice.domain.entity.ApplicationWorkFlow;
 import com.beaconfire.applicationservice.domain.entity.DigitalDocument;
 import com.beaconfire.applicationservice.domain.entity.Employee;
+import com.beaconfire.applicationservice.domain.entity.VisaDocumentStatus;
 import com.beaconfire.applicationservice.domain.request.ApplicationFormRequest;
 import com.beaconfire.applicationservice.domain.response.ApplicationResponse;
 import com.beaconfire.applicationservice.domain.response.PendingApplicationResponse;
 import com.beaconfire.applicationservice.domain.response.RejectedApplicationResponse;
+import com.beaconfire.applicationservice.domain.response.VisaStatusManagementResponse;
 import com.beaconfire.applicationservice.exception.approveApplicationFailedException;
 import com.beaconfire.applicationservice.exception.rejectApplicationFailedException;
 import com.beaconfire.applicationservice.service.ApplicationWorkFlowService;
 import com.beaconfire.applicationservice.service.DigitalDocumentService;
+import com.beaconfire.applicationservice.service.VisaDocumentStatusService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,10 +31,12 @@ import java.util.List;
 public class ApplicationController {
     private final ApplicationWorkFlowService applicationWorkFlowService;
     private final DigitalDocumentService digitalDocumentService;
+    private final VisaDocumentStatusService visaDocumentStatusService;
     @Autowired
-    public ApplicationController(ApplicationWorkFlowService applicationWorkFlowService, DigitalDocumentService digitalDocumentService){
+    public ApplicationController(ApplicationWorkFlowService applicationWorkFlowService, DigitalDocumentService digitalDocumentService, VisaDocumentStatusService visaDocumentStatusService){
         this.applicationWorkFlowService = applicationWorkFlowService;
         this.digitalDocumentService = digitalDocumentService;
+        this.visaDocumentStatusService = visaDocumentStatusService;
     }
 
     /**
@@ -43,11 +48,27 @@ public class ApplicationController {
     @PostMapping("/{employeeId}/applicationForm")
     @ApiOperation(value = "update employee", response = Employee.class)
     public ResponseEntity<Object> submitApplicationForm(@PathVariable Integer employeeId,
-                                                        @RequestBody ApplicationFormRequest applicationFormRequest
-                                                        /* @RequestParam("driverLicense") MultipartFile driverLicense,
-                                                        @RequestParam("OPTReceipt") MultipartFile OPTReceipt */){
+                                                        @RequestPart("applicationFormRequest") ApplicationFormRequest applicationFormRequest,
+                                                        @RequestPart("driverLicense") MultipartFile driverLicense,
+                                                        @RequestPart("OPTReceipt") MultipartFile OPTReceipt){
+
+        // update employee info in mongoDB
         applicationWorkFlowService.updateApplicationForm(employeeId, applicationFormRequest);
+
+        // upload driverLicense and update personalDocuments in mongoDB
+        String driverLicenseFileName = digitalDocumentService.uploadFile(driverLicense);
+        digitalDocumentService.updatePersonalDocuments(employeeId, driverLicenseFileName, "driver License");
+
+        //upload OPT Receipt and update personalDocuments in mongoDB
+        String OPTFileName = digitalDocumentService.uploadFile(OPTReceipt);
+        digitalDocumentService.updatePersonalDocuments(employeeId, OPTFileName, "OPT Receipt");
+
+        //create a record in visaDocumentStatus table
+        String OPTReceiptURL = digitalDocumentService.getFileUrl(OPTFileName).toString();
+        visaDocumentStatusService.createVisaDocumentStatusRecord(employeeId, OPTReceiptURL);
+
         return new ResponseEntity<>("Application form submitted successfully", HttpStatus.OK);
+
     }
 
     /**
@@ -65,9 +86,9 @@ public class ApplicationController {
            upload together or upload separately ?
          */
         for(int i = 0; i < digitalDocumentList.size(); i++){
-            digitalDocumentService.uploadFile(files.get(i));
+            String fileName = digitalDocumentService.uploadFile(files.get(i));
             String fileTitle = digitalDocumentList.get(i).getTitle();
-            digitalDocumentService.updatePersonalDocuments(employeeId, files.get(i), fileTitle);
+            digitalDocumentService.updatePersonalDocuments(employeeId, fileName, fileTitle);
         }
 
         // update application status
@@ -166,7 +187,7 @@ public class ApplicationController {
 
 
     /**
-     * hr rejects an applicatio and gives feedback
+     * hr rejects an application and gives feedback
      * @param applicationId
      * @param feedback
      * @return
@@ -182,5 +203,84 @@ public class ApplicationController {
 
         //send email to employee
     }
+
+
+    // visa status management part
+
+    /**
+     * employee get his/her visaStatusManagement page
+     * @param employeeId
+     * @return
+     */
+    @GetMapping("{employeeId}/visaStatusManagement")
+    public VisaStatusManagementResponse getVisaStatus(@PathVariable Integer employeeId){
+        VisaDocumentStatus visaDocumentStatus = visaDocumentStatusService.getVisaDocumentStatusByEmployeeId(employeeId);
+        String status = visaDocumentStatus.getStatus();
+        if(status.equals("approved")){
+            return VisaStatusManagementResponse.builder().message("All documents have been approved.").build();
+        }
+        else if(status.equals("rejected")){
+            ApplicationWorkFlow applicationWorkFlow = applicationWorkFlowService.getApplicationByEmployeeId(employeeId);
+            String feedback = applicationWorkFlow.getComment();
+            return VisaStatusManagementResponse.builder().message(feedback).build();
+        }
+        else if(status.equals("never submitted")){
+            String fileType = visaDocumentStatusService.getDocumentTypeById(visaDocumentStatus.getFileId());
+            return VisaStatusManagementResponse.builder().message("Please upload your " + fileType).build();
+        }
+        else{
+            String fileType = visaDocumentStatusService.getDocumentTypeById(visaDocumentStatus.getFileId());
+            return VisaStatusManagementResponse.builder().message("Waiting for HR to approve your " + fileType).build();
+        }
+    }
+
+    /**
+     * employee uploads visa document
+     * @param employeeId
+     * @param file
+     * @param fileId
+     * @param fileType
+     * @return
+     */
+    @PostMapping("/{employeeId}/visaStatusManagement")
+    public ResponseEntity<Object> submitVisaDocuments(@PathVariable Integer employeeId,
+                                                      @RequestPart("file") MultipartFile file,
+                                                      @RequestPart("fileId") Integer fileId,
+                                                      @RequestPart("fileType") String fileType){
+        String fileName = digitalDocumentService.uploadFile(file);
+        digitalDocumentService.updatePersonalDocuments(employeeId, fileName, fileType);
+        visaDocumentStatusService.updateVisaDocumentStatus(employeeId, "pending", fileId);
+        return new ResponseEntity<>("Waiting for HR to approve your " + fileType, HttpStatus.OK);
+    }
+
+
+    /**
+     * Hr reviews visa documents, approve or reject
+     * @param employeeId
+     * @param action
+     * @param feedback
+     * @return
+     */
+    @PostMapping("visaDocuments/{employeeId}")
+    public ResponseEntity<Object> reviewVisaDocuments(@PathVariable Integer employeeId,
+                                                      @RequestParam String action,
+                                                      @RequestParam String feedback){
+        if(action.equals("approve")){
+
+            // For approving an application, no need to add feedback, so feedback will be null
+            visaDocumentStatusService.approveSubmittedDocument(employeeId);
+            return new ResponseEntity<>("This file has been successfully approved.", HttpStatus.OK);
+
+        }else if(action.equals("reject")){
+
+            visaDocumentStatusService.rejectSubmittedDocument(employeeId);
+
+            // When you reject a document, you reject the application simultaneously
+            applicationWorkFlowService.rejectApplication(employeeId, feedback);
+            return new ResponseEntity<>("This document has been successfully rejected as well as the application.", HttpStatus.OK);
+        }
+        return null;
+    }
+
 
 }
