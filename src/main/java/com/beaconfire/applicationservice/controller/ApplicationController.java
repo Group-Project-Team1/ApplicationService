@@ -4,11 +4,8 @@ import com.beaconfire.applicationservice.domain.entity.ApplicationWorkFlow;
 import com.beaconfire.applicationservice.domain.entity.DigitalDocument;
 import com.beaconfire.applicationservice.domain.entity.Employee;
 import com.beaconfire.applicationservice.domain.entity.VisaDocumentStatus;
-import com.beaconfire.applicationservice.domain.request.ApplicationFormRequest;
-import com.beaconfire.applicationservice.domain.response.ApplicationResponse;
-import com.beaconfire.applicationservice.domain.response.PendingApplicationResponse;
-import com.beaconfire.applicationservice.domain.response.RejectedApplicationResponse;
 import com.beaconfire.applicationservice.domain.response.VisaStatusManagementResponse;
+import com.beaconfire.applicationservice.exception.CannotAccessOtherUsersDataException;
 import com.beaconfire.applicationservice.exception.approveApplicationFailedException;
 import com.beaconfire.applicationservice.exception.rejectApplicationFailedException;
 import com.beaconfire.applicationservice.service.ApplicationWorkFlowService;
@@ -19,11 +16,14 @@ import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @Api(value = "MongoDemoController RESTful endpoints")
@@ -42,16 +42,14 @@ public class ApplicationController {
     /**
      * submit application form
      * @param employeeId
-     * @param applicationFormRequest
-     * @return
+     * @param OPTReceiptURL
      */
-    @PostMapping("/{employeeId}/applicationForm")
+    @PostMapping("/employee/{employeeId}/applicationForm")
     @ApiOperation(value = "update employee", response = Employee.class)
-    public ResponseEntity<Object> submitApplicationForm(@PathVariable Integer employeeId,
-                                                        @RequestPart("applicationFormRequest") ApplicationFormRequest applicationFormRequest,
-                                                        @RequestPart("driverLicense") MultipartFile driverLicense,
-                                                        @RequestPart("OPTReceipt") MultipartFile OPTReceipt){
-
+    @PreAuthorize("hasAuthority('employee')")
+    public void submitApplicationForm(@PathVariable Integer employeeId,
+                                      @RequestParam("OPTReceiptURL") String OPTReceiptURL){
+/*
         // update employee info in mongoDB
         applicationWorkFlowService.updateApplicationForm(employeeId, applicationFormRequest);
 
@@ -59,75 +57,53 @@ public class ApplicationController {
         String driverLicenseFileName = digitalDocumentService.uploadFile(driverLicense);
         digitalDocumentService.updatePersonalDocuments(employeeId, driverLicenseFileName, "driver License");
 
-        //upload OPT Receipt and update personalDocuments in mongoDB
+        // upload OPT Receipt and update personalDocuments in mongoDB
         String OPTFileName = digitalDocumentService.uploadFile(OPTReceipt);
         digitalDocumentService.updatePersonalDocuments(employeeId, OPTFileName, "OPT Receipt");
+*/
 
         //create a record in visaDocumentStatus table
-        String OPTReceiptURL = digitalDocumentService.getFileUrl(OPTFileName).toString();
+//        String OPTReceiptURL = digitalDocumentService.getFileUrl(OPTFileName).toString();
         visaDocumentStatusService.createVisaDocumentStatusRecord(employeeId, OPTReceiptURL);
-
-        return new ResponseEntity<>("Application form submitted successfully", HttpStatus.OK);
 
     }
 
     /**
-     * documents and submit the entire application
+     * upload documents and submit the entire application
      * @param employeeId
-     * @param files
-     * @return
      */
-    @PostMapping("/{employeeId}/application")
-    public ResponseEntity<Object> submitApplication(@PathVariable Integer employeeId, @RequestParam("files") List<MultipartFile> files){
-        List<DigitalDocument> digitalDocumentList = digitalDocumentService.getDocuments();
-
+    @PostMapping("/employee/{employeeId}/application")
+    @PreAuthorize("hasAuthority('employee')")
+    public void submitApplication(@PathVariable Integer employeeId){
 
         /* upload documents and update personalDocuments in mongoDB
            upload together or upload separately ?
          */
-        for(int i = 0; i < digitalDocumentList.size(); i++){
-            String fileName = digitalDocumentService.uploadFile(files.get(i));
-            String fileTitle = digitalDocumentList.get(i).getTitle();
-            digitalDocumentService.updatePersonalDocuments(employeeId, fileName, fileTitle);
-        }
+//        for(int i = 0; i < digitalDocumentList.size(); i++){
+//            String fileName = digitalDocumentService.uploadFile(files.get(i));
+//            String fileTitle = digitalDocumentList.get(i).getTitle();
+//            digitalDocumentService.updatePersonalDocuments(employeeId, fileName, fileTitle);
+//        }
 
         // update application status
         applicationWorkFlowService.updateApplicationStatus(employeeId);
 
-        return new ResponseEntity<>("Pleas wait for HR to review your application.", HttpStatus.OK);
     }
 
 
-    /**
-     * employee checks his/her pending application
-     * @param employeeId
-     * @return
-     */
-    @GetMapping("/{employeeId}/pendingApplication")
-    public PendingApplicationResponse getPendingApplication(@PathVariable Integer employeeId){
-        Employee employee = applicationWorkFlowService.getEmployeeById(employeeId);
-        return PendingApplicationResponse.builder()
-                .message("Please wait for HR to review your application.")
-                .applicationDerail(employee)
-                .build();
+    @GetMapping("/all/{employeeId}/application")
+    public ApplicationWorkFlow getApplicationByEmployeeId(@PathVariable Integer employeeId){
+//        int userId = (int) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+//        if(userId != 1 && userId != employeeId){
+//            throw new CannotAccessOtherUsersDataException("You cannot view the application of other employee.");
+//        }
 
-    }
-
-    /**
-     * employee checks his/her rejected application
-     * @param employeeId
-     * @return
-     */
-    @GetMapping("{employeeId}/rejectedApplication")
-    public RejectedApplicationResponse getRejectedApplication(@PathVariable Integer employeeId){
-        Employee employee = applicationWorkFlowService.getEmployeeById(employeeId);
         ApplicationWorkFlow applicationWorkFlow = applicationWorkFlowService.getApplicationByEmployeeId(employeeId);
-        return RejectedApplicationResponse.builder()
-                .feedback(applicationWorkFlow.getComment())
-                .message("Successfully get the detail of your rejected application.")
-                .applicationDerail(employee)
-                .build();
+        if(applicationWorkFlow == null) System.out.println("null");
+        else System.out.println(applicationWorkFlow.getId());
+        return applicationWorkFlow;
     }
+
 
     /**
      * create a new application after registration
@@ -146,83 +122,66 @@ public class ApplicationController {
      * @param status
      * @return
      */
-    @GetMapping("/{status}/applications")
-    public ResponseEntity<Object> getApplicationsByStatus(@PathVariable String status){
+    @GetMapping("/hr/{status}/applications")
+    @PreAuthorize("hasAuthority('hr')")
+    public List<ApplicationWorkFlow> getApplicationsByStatus(@PathVariable String status){
         List<ApplicationWorkFlow> applications = applicationWorkFlowService.getApplicationsByStatus(status);
-        return ResponseEntity.ok().body(applications);
+        return applications;
     }
 
 
-    /**
-     * hr views application
-     * @param applicationId
-     * @return
-     */
-    @GetMapping("/viewApplication/{applicationId}")
-    public ApplicationResponse viewApplication(@PathVariable Integer applicationId){
-        ApplicationWorkFlow applicationWorkFlow = applicationWorkFlowService.getApplicationById(applicationId);
-        Employee employee = applicationWorkFlowService.getEmployeeById(applicationWorkFlow.getEmployeeId());
-        return ApplicationResponse.builder()
-                .applicationId(applicationId)
-                .applicationStatus(applicationWorkFlow.getStatus())
-                .applicationDerail(employee)
-                .build();
-    }
-
 
     /**
-     * hr approve an application
-     * @param applicationId
+     * hr reviews an application
+     * @param employeeId
      * @return
      */
-    @PostMapping("/viewApplication/{applicationId}")
-    public ResponseEntity<Object> approveApplication(@PathVariable Integer applicationId){
-        ApplicationWorkFlow applicationWorkFlow = applicationWorkFlowService.getApplicationById(applicationId);
-        if(!applicationWorkFlow.getStatus().equals("pending")){
-            throw new approveApplicationFailedException();
+    @PostMapping("/hr/viewApplication/{employeeId}")
+    @PreAuthorize("hasAuthority('hr')")
+    public ResponseEntity<Object> reviewApplication(@PathVariable Integer employeeId, @RequestParam String action, @RequestParam String feedback){
+        ApplicationWorkFlow applicationWorkFlow = applicationWorkFlowService.getApplicationByEmployeeId(employeeId);
+        if(action.equals("approve")){
+            if(!applicationWorkFlow.getStatus().equals("pending")){
+                throw new approveApplicationFailedException();
+            }
+            applicationWorkFlowService.approveApplication(applicationWorkFlow.getId());
+            return new ResponseEntity<>("This application has been successfully approved.", HttpStatus.OK);
+        }else{
+            if(!applicationWorkFlow.getStatus().equals("pending")){
+                throw new rejectApplicationFailedException();
+            }
+            applicationWorkFlowService.rejectApplication(employeeId, feedback);
+            //send email to employee
+            return new ResponseEntity<>("This application has been successfully rejected.", HttpStatus.OK);
+
         }
-        applicationWorkFlowService.approveApplication(applicationWorkFlow.getId());
-        return new ResponseEntity<>("This application is successfully approved.", HttpStatus.OK);
-    }
 
-
-    /**
-     * hr rejects an application and gives feedback
-     * @param applicationId
-     * @param feedback
-     * @return
-     */
-    @PostMapping("/rejectApplication/{applicationId}")
-    public ResponseEntity<Object> rejectApplication(@PathVariable Integer applicationId, @RequestParam String feedback){
-        ApplicationWorkFlow applicationWorkFlow = applicationWorkFlowService.getApplicationById(applicationId);
-        if(!applicationWorkFlow.getStatus().equals("pending")){
-            throw new rejectApplicationFailedException();
-        }
-        applicationWorkFlowService.rejectApplication(applicationId, feedback);
-        return new ResponseEntity<>("This application is successfully rejected.", HttpStatus.OK);
-
-        //send email to employee
     }
 
 
     // visa status management part
 
     /**
-     * employee get his/her visaStatusManagement page
+     * employee gets his/her visaStatusManagement page
      * @param employeeId
      * @return
      */
-    @GetMapping("{employeeId}/visaStatusManagement")
+    @GetMapping("/employee/{employeeId}/visaStatusManagement")
+    @PreAuthorize("hasAuthority('employee')")
     public VisaStatusManagementResponse getVisaStatus(@PathVariable Integer employeeId){
+//        int userId = (int) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+//        if(userId != employeeId){
+//            throw new CannotAccessOtherUsersDataException("You cannot view the visa status management page of other employee.");
+//        }
         VisaDocumentStatus visaDocumentStatus = visaDocumentStatusService.getVisaDocumentStatusByEmployeeId(employeeId);
         String status = visaDocumentStatus.getStatus();
         if(status.equals("approved")){
             return VisaStatusManagementResponse.builder().message("All documents have been approved.").build();
         }
         else if(status.equals("rejected")){
-            ApplicationWorkFlow applicationWorkFlow = applicationWorkFlowService.getApplicationByEmployeeId(employeeId);
-            String feedback = applicationWorkFlow.getComment();
-            return VisaStatusManagementResponse.builder().message(feedback).build();
+            String feedback = visaDocumentStatus.getComment();
+            String fileType = visaDocumentStatusService.getDocumentTypeById(visaDocumentStatus.getFileId());
+            return VisaStatusManagementResponse.builder().message(feedback + " Please reupload your " + fileType).build();
         }
         else if(status.equals("never submitted")){
             String fileType = visaDocumentStatusService.getDocumentTypeById(visaDocumentStatus.getFileId());
@@ -237,20 +196,18 @@ public class ApplicationController {
     /**
      * employee uploads visa document
      * @param employeeId
-     * @param file
      * @param fileId
-     * @param fileType
      * @return
      */
-    @PostMapping("/{employeeId}/visaStatusManagement")
-    public ResponseEntity<Object> submitVisaDocuments(@PathVariable Integer employeeId,
-                                                      @RequestPart("file") MultipartFile file,
-                                                      @RequestPart("fileId") Integer fileId,
-                                                      @RequestPart("fileType") String fileType){
-        String fileName = digitalDocumentService.uploadFile(file);
-        digitalDocumentService.updatePersonalDocuments(employeeId, fileName, fileType);
+    @PostMapping("/employee/{employeeId}/visaStatusManagement")
+    @PreAuthorize("hasAuthority('employee')")
+    public void submitVisaDocuments(@PathVariable Integer employeeId,
+                                    @RequestParam("fileId") Integer fileId
+                                    /* @RequestPart("file") MultipartFile file,
+                                    @RequestPart("fileType") String fileType */){
+//        String fileName = digitalDocumentService.uploadFile(file);
+//        digitalDocumentService.updatePersonalDocuments(employeeId, fileName, fileType);
         visaDocumentStatusService.updateVisaDocumentStatus(employeeId, "pending", fileId);
-        return new ResponseEntity<>("Waiting for HR to approve your " + fileType, HttpStatus.OK);
     }
 
 
@@ -261,7 +218,8 @@ public class ApplicationController {
      * @param feedback
      * @return
      */
-    @PostMapping("visaDocuments/{employeeId}")
+    @PostMapping("/hr/visaDocuments/{employeeId}")
+    @PreAuthorize("hasAuthority('hr')")
     public ResponseEntity<Object> reviewVisaDocuments(@PathVariable Integer employeeId,
                                                       @RequestParam String action,
                                                       @RequestParam String feedback){
@@ -273,11 +231,8 @@ public class ApplicationController {
 
         }else if(action.equals("reject")){
 
-            visaDocumentStatusService.rejectSubmittedDocument(employeeId);
-
-            // When you reject a document, you reject the application simultaneously
-            applicationWorkFlowService.rejectApplication(employeeId, feedback);
-            return new ResponseEntity<>("This document has been successfully rejected as well as the application.", HttpStatus.OK);
+            visaDocumentStatusService.rejectSubmittedDocument(employeeId, feedback);
+            return new ResponseEntity<>("This document has been successfully rejected.", HttpStatus.OK);
         }
         return null;
     }

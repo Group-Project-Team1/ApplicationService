@@ -5,6 +5,7 @@ import io.swagger.annotations.ApiModelProperty;
 import lombok.*;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import javax.persistence.Id;
 import javax.validation.constraints.Email;
 import javax.validation.constraints.NotNull;
 import java.io.File;
@@ -12,7 +13,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-@Document(collection = "employee1")
+@Document(collection = "employee")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,7 +21,8 @@ import java.util.List;
 @ToString
 public class Employee {
     @ApiModelProperty(notes = "employee's objectId")
-    private ObjectId _id;
+    @Id
+    private Integer id;
     @ApiModelProperty(notes = "employee's employee id")
     private Integer userId;
     @ApiModelProperty(notes = "employee's first name")

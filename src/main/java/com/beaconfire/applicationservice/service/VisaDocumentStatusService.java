@@ -40,9 +40,10 @@ public class VisaDocumentStatusService {
     }
 
     @Transactional
-    public void rejectSubmittedDocument(Integer employeeId){
+    public void rejectSubmittedDocument(Integer employeeId, String feedback){
         int currentDocumentId = visaDocumentStatusDao.getDocumentIdByEmployeeId(employeeId);
         visaDocumentStatusDao.updateVisaDocumentStatus(employeeId, "rejected", currentDocumentId);
+        visaDocumentStatusDao.addRejectFeedback(employeeId, feedback);
     }
 
     @Transactional

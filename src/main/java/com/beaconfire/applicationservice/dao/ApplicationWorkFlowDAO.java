@@ -73,20 +73,9 @@ public class ApplicationWorkFlowDAO {
         }catch (Exception e){
             e.printStackTrace();
         }
-        return result.isPresent() ? null : result.get();
+        return result.isPresent() ? result.get() : null;
     }
 
-    public ApplicationWorkFlow getApplicationById(Integer applicationId){
-        Session session;
-        ApplicationWorkFlow applicationWorkFlow = new ApplicationWorkFlow();
-        try{
-            session = sessionFactory.getCurrentSession();
-            applicationWorkFlow = session.get(ApplicationWorkFlow.class, applicationId);
-        }catch (Exception e){
-            e.printStackTrace();
-        }
-        return applicationWorkFlow;
-    }
 
     public List<ApplicationWorkFlow> getApplicationsByStatus(String status){
         Session session;

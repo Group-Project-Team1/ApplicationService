@@ -8,6 +8,7 @@ import com.beaconfire.applicationservice.domain.request.ApplicationFormRequest;
 import com.beaconfire.applicationservice.repo.EmployeeRepo;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -16,6 +17,7 @@ import java.net.URL;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ApplicationWorkFlowService {
@@ -24,7 +26,7 @@ public class ApplicationWorkFlowService {
     private final EmployeeRepo repository;
 
     @Autowired
-    public ApplicationWorkFlowService(EmployeeRepo repository, DigitalDocumentService digitalDocumentService) {
+    public ApplicationWorkFlowService(EmployeeRepo repository) {
         this.repository = repository;
     }
     @Autowired
@@ -43,32 +45,11 @@ public class ApplicationWorkFlowService {
         if(repository.findEmployeeByUserId(employeeId).size() == 0) {
             Employee employee = new Employee();
             employee.setUserId(employeeId);
+            employee.setId(employeeId);
             repository.save(employee);
         }
     }
 
-    public void updateApplicationForm(Integer employeeId, ApplicationFormRequest applicationFormRequest){
-
-        Employee employee = repository.findEmployeeByUserId(employeeId).get(0);
-        employee.setFirstName(applicationFormRequest.getFirstName());
-        employee.setLastName(applicationFormRequest.getLastName());
-        employee.setMiddleName(applicationFormRequest.getMiddleName());
-        employee.setPreferredName(applicationFormRequest.getPreferredName());
-        employee.setAddress(applicationFormRequest.getAddress());
-        employee.setCellPhoneNum(applicationFormRequest.getCellPhoneNum());
-        employee.setWorkPhoneNum(applicationFormRequest.getWorkPhoneNum());
-        employee.setGender(applicationFormRequest.getGender());
-        employee.setDateOFBirth(applicationFormRequest.getDateOfBirth());
-        employee.setSSN(applicationFormRequest.getSSN());
-        employee.setIdentity(applicationFormRequest.getIdentity());
-        employee.setVisaStatus(applicationFormRequest.getVisaStatus());
-        employee.setDriverLicenseNumber(applicationFormRequest.getDriverLicenseNumber());
-        employee.setExpirationDate(applicationFormRequest.getExpirationDate());
-        employee.setReference(applicationFormRequest.getReference());
-        employee.setContacts(applicationFormRequest.getContacts());
-
-        repository.save(employee);
-    }
 
 
     /* use when employee submit their entire application
@@ -79,22 +60,19 @@ public class ApplicationWorkFlowService {
         applicationWorkFlowDAO.updateApplication(employeeId);
     }
 
-    public Employee getEmployeeById (Integer id){
-        return repository.findEmployeeByUserId(id).get(0);
-    }
 
     @Transactional
     public List<ApplicationWorkFlow> getApplicationsByStatus(String status){
         return applicationWorkFlowDAO.getApplicationsByStatus(status);
     }
 
-    @Transactional
-    public ApplicationWorkFlow getApplicationById(Integer applicationId){
-        return applicationWorkFlowDAO.getApplicationById(applicationId);
-    }
 
     @Transactional
     public ApplicationWorkFlow getApplicationByEmployeeId(Integer employeeId){
+        ApplicationWorkFlow applicationWorkFlow = applicationWorkFlowDAO.getApplicationByEmployeeId(employeeId);
+        if (applicationWorkFlow == null || applicationWorkFlow.getStatus().equals("never submitted")) {
+            throw new NullPointerException("The employee has never submitted an application.");
+        }
         return applicationWorkFlowDAO.getApplicationByEmployeeId(employeeId);
     }
 
@@ -107,5 +85,6 @@ public class ApplicationWorkFlowService {
     public void rejectApplication(Integer applicationId, String feedback){
         applicationWorkFlowDAO.rejectApplication(applicationId, feedback);
     }
+
 
 }

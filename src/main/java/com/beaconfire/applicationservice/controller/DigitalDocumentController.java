@@ -28,10 +28,10 @@ public class DigitalDocumentController {
      * get all digital documents
      * @return
      */
-    @GetMapping("/digitalDocuments")
-    public ResponseEntity<List<DigitalDocument>> getDocuments(){
+    @GetMapping("/all/digitalDocuments")
+    public List<DigitalDocument> getDocuments(){
         List<DigitalDocument> digitalDocumentList = digitalDocumentService.getDocuments();
-        return ResponseEntity.ok().body(digitalDocumentList);
+        return digitalDocumentList;
     }
 
 
@@ -40,7 +40,7 @@ public class DigitalDocumentController {
      * @param fileTitle
      * @return
      */
-    @GetMapping("/download/{fileTitle}")
+    @GetMapping("/all/download/{fileTitle}")
     public ResponseEntity<Object> downloadFile(@PathVariable String fileTitle){
         byte[] fileContent = digitalDocumentService.downloadFile(fileTitle);
         return ResponseEntity.ok()
@@ -78,10 +78,10 @@ public class DigitalDocumentController {
      * @param multipartFile
      * @return
      */
-    @PostMapping("/digitalDocuments")
-    public ResponseEntity<Object> uploadFile(@RequestParam("file") MultipartFile multipartFile) {
-        digitalDocumentService.uploadFile(multipartFile);
-        return new ResponseEntity<>(MESSAGE_1, HttpStatus.OK);
+    @PostMapping("/employee/digitalDocuments")
+    public String uploadFile(@RequestPart("file") MultipartFile multipartFile) {
+        String fileName = digitalDocumentService.uploadFile(multipartFile);
+        return fileName;
     }
 
 
@@ -91,7 +91,7 @@ public class DigitalDocumentController {
      * @param fileName
      * @return
      */
-    @DeleteMapping("/digitalDocuments")
+    @DeleteMapping("/employee/digitalDocuments")
     public ResponseEntity<Object> cancelUpload(@PathVariable String fileName){
         digitalDocumentService.deleteFileFromS3Bucket(fileName);
         return new ResponseEntity<>(MESSAGE_2, HttpStatus.OK);
@@ -103,10 +103,10 @@ public class DigitalDocumentController {
      * get presigned object url
      * @param
      */
-    @GetMapping("/presignedURL/{fileName}")
-    public ResponseEntity<Object> getFileUrl(@PathVariable String fileName){
+    @GetMapping("/all/presignedURL/{fileName}")
+    public String getFileUrl(@PathVariable String fileName){
         URL url = digitalDocumentService.getFileUrl(fileName);
-        return ResponseEntity.ok().body(url);
+        return url.toString();
     }
 
 }

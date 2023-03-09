@@ -45,7 +45,7 @@ public class VisaDocumentStatusDao {
         Session session;
         try{
             session = sessionFactory.getCurrentSession();
-            VisaDocumentStatus visaDocumentStatus = session.get(VisaDocumentStatus.class, employeeId);
+            VisaDocumentStatus visaDocumentStatus = getVisaDocumentStatusByEmployeeId(employeeId);
             visaDocumentStatus.setStatus(status);
             if(fileId != -1){
                 visaDocumentStatus.setFileId(fileId);
@@ -61,7 +61,7 @@ public class VisaDocumentStatusDao {
         int res = 0;
         try {
             session = sessionFactory.getCurrentSession();
-            VisaDocumentStatus visaDocumentStatus = session.get(VisaDocumentStatus.class, employeeId);
+            VisaDocumentStatus visaDocumentStatus = getVisaDocumentStatusByEmployeeId(employeeId);
             res = visaDocumentStatus.getFileId();
         }catch (Exception e){
             e.printStackTrace();
@@ -86,5 +86,19 @@ public class VisaDocumentStatusDao {
         return result.isPresent() ? result.get() : null;
 
     }
+
+    public void addRejectFeedback(Integer employeeId, String feedback){
+        Session session;
+        try{
+            session = sessionFactory.getCurrentSession();
+            VisaDocumentStatus visaDocumentStatus = getVisaDocumentStatusByEmployeeId(employeeId);
+            visaDocumentStatus.setComment(feedback);
+
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+
 
 }

@@ -29,4 +29,7 @@ public class VisaDocumentStatus {
 
     @Column(name = "status")
     private String status;
+
+    @Column(name = "comment")
+    private String comment;
 }

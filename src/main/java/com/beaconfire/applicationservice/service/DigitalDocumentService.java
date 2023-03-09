@@ -145,17 +145,7 @@ public class DigitalDocumentService {
         repository.save(employee);
     }
 
-    //    @Transactional
-//    public List<DigitalDocument> getDocuments(ApplicationFormRequest applicationFormRequest){
-//        List<DigitalDocument> results = new ArrayList<>();
-//        if(!applicationFormRequest.getIsCitizenOrGreenCard()){
-//            String visaType = applicationFormRequest.getVisaStatus().getVisaType();
-//
-//            // document with smaller id should be uploaded before document with larger id
-//            results = digitalDocumentDAO.getDocumentsByType(visaType).stream().sorted(Comparator.comparingInt(DigitalDocument::getId)).collect(Collectors.toList());
-//        }
-//        return results;
-//    }
+
 
     /**
      * get all digital documents

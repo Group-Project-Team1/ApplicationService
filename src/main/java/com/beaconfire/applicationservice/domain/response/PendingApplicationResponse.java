@@ -10,6 +10,6 @@ import lombok.*;
 @NoArgsConstructor
 public class PendingApplicationResponse {
     private String message;
-    private Employee applicationDerail;
+    private Employee applicationDetail;
 
 }
