@@ -56,6 +56,20 @@ public class VisaDocumentStatusDao {
         }
     }
 
+    public void updateVisaDocumentStatusURL(Integer employeeId, String url){
+        Session session;
+        try{
+            session = sessionFactory.getCurrentSession();
+            VisaDocumentStatus visaDocumentStatus = getVisaDocumentStatusByEmployeeId(employeeId);
+            visaDocumentStatus.setPath(url);
+            session.saveOrUpdate(visaDocumentStatus);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+
+
     public int getDocumentIdByEmployeeId(Integer employeeId){
         Session session;
         int res = 0;
@@ -99,6 +113,22 @@ public class VisaDocumentStatusDao {
         }
     }
 
+    public List<VisaDocumentStatus> getAllPendingVisaDocuments(){
+        Session session;
+        List<VisaDocumentStatus> result = new ArrayList<>();
+        try{
+            session = sessionFactory.getCurrentSession();
+            CriteriaBuilder cb= sessionFactory.getCriteriaBuilder();
+            CriteriaQuery<VisaDocumentStatus> cq = cb.createQuery(VisaDocumentStatus.class);
+            Root<VisaDocumentStatus> root = cq.from(VisaDocumentStatus.class);
+            Predicate predicate = cb.equal(root.get("status"), "pending");
+            cq.select(root).where(predicate);
+            result = session.createQuery(cq).getResultList();
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+        return result;
 
+    }
 
 }

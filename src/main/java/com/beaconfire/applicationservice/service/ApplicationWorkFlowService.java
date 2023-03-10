@@ -26,13 +26,11 @@ public class ApplicationWorkFlowService {
     private final EmployeeRepo repository;
 
     @Autowired
-    public ApplicationWorkFlowService(EmployeeRepo repository) {
+    public ApplicationWorkFlowService(EmployeeRepo repository, ApplicationWorkFlowDAO applicationWorkFlowDAO) {
         this.repository = repository;
-    }
-    @Autowired
-    public void setApplicationWorkFlowDAO(ApplicationWorkFlowDAO applicationWorkFlowDAO) {
         this.applicationWorkFlowDAO = applicationWorkFlowDAO;
     }
+
 
     @Transactional
     public void createNewApplication(Integer employeeId){
@@ -49,7 +47,6 @@ public class ApplicationWorkFlowService {
             repository.save(employee);
         }
     }
-
 
 
     /* use when employee submit their entire application
@@ -70,7 +67,7 @@ public class ApplicationWorkFlowService {
     @Transactional
     public ApplicationWorkFlow getApplicationByEmployeeId(Integer employeeId){
         ApplicationWorkFlow applicationWorkFlow = applicationWorkFlowDAO.getApplicationByEmployeeId(employeeId);
-        if (applicationWorkFlow == null || applicationWorkFlow.getStatus().equals("never submitted")) {
+        if (applicationWorkFlow == null) {
             throw new NullPointerException("The employee has never submitted an application.");
         }
         return applicationWorkFlowDAO.getApplicationByEmployeeId(employeeId);

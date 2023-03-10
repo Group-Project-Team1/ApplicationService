@@ -39,7 +39,7 @@ public class DigitalDocumentService {
     private final EmployeeRepo repository;
     private static final Logger log = LoggerFactory.getLogger(DigitalDocumentService.class);
     @Autowired
-    private AmazonS3 amazonS3;
+    AmazonS3 amazonS3;
     @Value("${aws.s3.bucket}")
     private String s3BucketName;
 
@@ -60,7 +60,7 @@ public class DigitalDocumentService {
      * @param multipartFile
      * @return
      */
-    private File convertMultiPartFileToFile(MultipartFile multipartFile) {
+    public File convertMultiPartFileToFile(MultipartFile multipartFile) {
         File file = new File(multipartFile.getOriginalFilename());
         try (FileOutputStream outputStream = new FileOutputStream(file)) {
             outputStream.write(multipartFile.getBytes());
@@ -80,6 +80,7 @@ public class DigitalDocumentService {
         try {
             File file = convertMultiPartFileToFile(multipartFile);
             fileName = LocalDateTime.now() + "_" + file.getName();
+            //fileName = file.getName();
 
             log.info("Uploading file with name {}", fileName);
             PutObjectRequest putObjectRequest = new PutObjectRequest(s3BucketName, fileName, file);
@@ -129,22 +130,6 @@ public class DigitalDocumentService {
         URL url = amazonS3.generatePresignedUrl(new GeneratePresignedUrlRequest(s3BucketName, fileName).withExpiration(expiration).withMethod(HttpMethod.GET));
         return url;
     }
-
-
-    public void updatePersonalDocuments(Integer employeeId, String fileName, String fileTitle){
-        PersonalDocument personalDocument = new PersonalDocument();
-        URL url = getFileUrl(fileName);
-        personalDocument.setTitle(fileTitle);
-        personalDocument.setPath(url.toString());
-        personalDocument.setCreateDate(Timestamp.valueOf(LocalDateTime.now()));
-
-        Employee employee = repository.findEmployeeByUserId(employeeId).get(0);
-        List<PersonalDocument> personalDocumentList = employee.getPersonalDocuments();
-        personalDocumentList.add(personalDocument);
-        employee.setPersonalDocuments(personalDocumentList);
-        repository.save(employee);
-    }
-
 
 
     /**
