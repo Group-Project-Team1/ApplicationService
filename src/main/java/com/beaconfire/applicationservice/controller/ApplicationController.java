@@ -112,6 +112,7 @@ public class ApplicationController {
      */
     @PostMapping("/createApplication/{employeeId}")
     public ResponseEntity<Object> createNewApplication(@PathVariable Integer employeeId){
+        System.out.println(2.75);
         applicationWorkFlowService.createNewApplication(employeeId);
         return new ResponseEntity<>("Successfully create a new application.", HttpStatus.OK);
     }

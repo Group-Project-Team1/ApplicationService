@@ -28,6 +28,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 .antMatchers("/application-service/hr/**").hasAuthority("hr")
                 .antMatchers("/application-service/employee/**").hasAuthority("employee")
                 .antMatchers("/application-service/all/**").permitAll()
+                .antMatchers("/application-service/createApplication/**").permitAll()
                 .anyRequest()
                 .authenticated();
     }

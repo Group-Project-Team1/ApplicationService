@@ -37,6 +37,7 @@ public class ApplicationWorkFlowService {
     @Transactional
     public void createNewApplication(Integer employeeId){
         // create a new application workflow in Mysql
+        System.out.println("OK");
         applicationWorkFlowDAO.createNewApplication(employeeId);
 
         /* insert a new employee in mongoDB
