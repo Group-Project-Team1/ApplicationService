@@ -9,6 +9,7 @@ import javax.persistence.Id;
 import javax.validation.constraints.Email;
 import javax.validation.constraints.NotNull;
 import java.io.File;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -52,7 +53,7 @@ public class Employee {
     @ApiModelProperty(notes = "employee's gender")
     private String gender;
     @ApiModelProperty(notes = "employee's birthday")
-    private Date dateOFBirth;
+    private LocalDate dateOFBirth;
     @ApiModelProperty(notes = "employee's SSN")
     @NotNull
     private String SSN;
@@ -66,7 +67,7 @@ public class Employee {
     @ApiModelProperty(notes = "employee's driver license's number")
     private String driverLicenseNumber;
     @ApiModelProperty(notes = "employee's driver license's expriation date")
-    private Date expirationDate;
+    private LocalDate expirationDate;
     @ApiModelProperty(notes = "employee's reference")
     private Employee reference;
     @ApiModelProperty(notes = "employee's emergency contact")

@@ -92,7 +92,7 @@ public class DigitalDocumentController {
      * @return
      */
     @DeleteMapping("/employee/digitalDocuments")
-    public ResponseEntity<Object> cancelUpload(@PathVariable String fileName){
+    public ResponseEntity<Object> cancelUpload(@RequestParam String fileName){
         digitalDocumentService.deleteFileFromS3Bucket(fileName);
         return new ResponseEntity<>(MESSAGE_2, HttpStatus.OK);
     }

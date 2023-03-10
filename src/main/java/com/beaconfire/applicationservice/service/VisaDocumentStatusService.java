@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.transaction.Transactional;
+import java.util.List;
 
 @Service
 public class VisaDocumentStatusService {
@@ -26,6 +27,11 @@ public class VisaDocumentStatusService {
     @Transactional
     public void updateVisaDocumentStatus(Integer employeeId, String status, Integer fileId){
         visaDocumentStatusDao.updateVisaDocumentStatus(employeeId, status, fileId);
+    }
+
+    @Transactional
+    public void updateVisaDocumentStatusURL(Integer employeeId, String url){
+        visaDocumentStatusDao.updateVisaDocumentStatusURL(employeeId, url);
     }
 
     @Transactional
@@ -55,5 +61,8 @@ public class VisaDocumentStatusService {
     public String getDocumentTypeById(Integer id){
         return visaDocumentsDao.getDocumentTypeById(id);
     }
+
+    @Transactional
+    public List<VisaDocumentStatus> getAllPendingVisaDocuments(){ return visaDocumentStatusDao.getAllPendingVisaDocuments(); }
 
 }

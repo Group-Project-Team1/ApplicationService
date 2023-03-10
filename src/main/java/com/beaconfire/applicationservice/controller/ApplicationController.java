@@ -4,8 +4,10 @@ import com.beaconfire.applicationservice.domain.entity.ApplicationWorkFlow;
 import com.beaconfire.applicationservice.domain.entity.DigitalDocument;
 import com.beaconfire.applicationservice.domain.entity.Employee;
 import com.beaconfire.applicationservice.domain.entity.VisaDocumentStatus;
+import com.beaconfire.applicationservice.domain.response.PendingVisaDocumentsResponse;
 import com.beaconfire.applicationservice.domain.response.VisaStatusManagementResponse;
 import com.beaconfire.applicationservice.exception.CannotAccessOtherUsersDataException;
+import com.beaconfire.applicationservice.exception.ResubmitApplicationException;
 import com.beaconfire.applicationservice.exception.approveApplicationFailedException;
 import com.beaconfire.applicationservice.exception.rejectApplicationFailedException;
 import com.beaconfire.applicationservice.service.ApplicationWorkFlowService;
@@ -13,6 +15,7 @@ import com.beaconfire.applicationservice.service.DigitalDocumentService;
 import com.beaconfire.applicationservice.service.VisaDocumentStatusService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,8 +23,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.amqp.core.Message;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,6 +37,8 @@ public class ApplicationController {
     private final ApplicationWorkFlowService applicationWorkFlowService;
     private final DigitalDocumentService digitalDocumentService;
     private final VisaDocumentStatusService visaDocumentStatusService;
+
+
     @Autowired
     public ApplicationController(ApplicationWorkFlowService applicationWorkFlowService, DigitalDocumentService digitalDocumentService, VisaDocumentStatusService visaDocumentStatusService){
         this.applicationWorkFlowService = applicationWorkFlowService;
@@ -49,22 +56,27 @@ public class ApplicationController {
     @PreAuthorize("hasAuthority('employee')")
     public void submitApplicationForm(@PathVariable Integer employeeId,
                                       @RequestParam("OPTReceiptURL") String OPTReceiptURL){
-/*
-        // update employee info in mongoDB
-        applicationWorkFlowService.updateApplicationForm(employeeId, applicationFormRequest);
-
-        // upload driverLicense and update personalDocuments in mongoDB
-        String driverLicenseFileName = digitalDocumentService.uploadFile(driverLicense);
-        digitalDocumentService.updatePersonalDocuments(employeeId, driverLicenseFileName, "driver License");
-
-        // upload OPT Receipt and update personalDocuments in mongoDB
-        String OPTFileName = digitalDocumentService.uploadFile(OPTReceipt);
-        digitalDocumentService.updatePersonalDocuments(employeeId, OPTFileName, "OPT Receipt");
-*/
 
         //create a record in visaDocumentStatus table
-//        String OPTReceiptURL = digitalDocumentService.getFileUrl(OPTFileName).toString();
-        visaDocumentStatusService.createVisaDocumentStatusRecord(employeeId, OPTReceiptURL);
+        ApplicationWorkFlow applicationWorkFlow = applicationWorkFlowService.getApplicationByEmployeeId(employeeId);
+        if(applicationWorkFlow == null){
+            throw new NullPointerException("You cannot submit application of an non-existing user.");
+        }else if(applicationWorkFlow.getStatus().equals("pending")){
+            throw new ResubmitApplicationException("Please wait for hr to review your application. Don't resubmit it.");
+        }else if(applicationWorkFlow.getStatus().equals("never submitted")){
+            if(visaDocumentStatusService.getVisaDocumentStatusByEmployeeId(employeeId) == null){
+                visaDocumentStatusService.createVisaDocumentStatusRecord(employeeId, OPTReceiptURL);
+            }else{
+                visaDocumentStatusService.updateVisaDocumentStatus(employeeId, "pending", 1);
+                visaDocumentStatusService.updateVisaDocumentStatusURL(employeeId, OPTReceiptURL);
+            }
+        }else if(applicationWorkFlow.getStatus().equals("rejected")){
+            // resubmit a rejected application
+            visaDocumentStatusService.updateVisaDocumentStatus(employeeId, "pending", 1);
+            visaDocumentStatusService.updateVisaDocumentStatusURL(employeeId, OPTReceiptURL);
+        }else{
+            throw new ResubmitApplicationException("Your application has already been approved. Don't resubmit it.");
+        }
 
     }
 
@@ -76,27 +88,28 @@ public class ApplicationController {
     @PreAuthorize("hasAuthority('employee')")
     public void submitApplication(@PathVariable Integer employeeId){
 
-        /* upload documents and update personalDocuments in mongoDB
-           upload together or upload separately ?
-         */
-//        for(int i = 0; i < digitalDocumentList.size(); i++){
-//            String fileName = digitalDocumentService.uploadFile(files.get(i));
-//            String fileTitle = digitalDocumentList.get(i).getTitle();
-//            digitalDocumentService.updatePersonalDocuments(employeeId, fileName, fileTitle);
-//        }
-
         // update application status
-        applicationWorkFlowService.updateApplicationStatus(employeeId);
+        ApplicationWorkFlow applicationWorkFlow = applicationWorkFlowService.getApplicationByEmployeeId(employeeId);
+        if(applicationWorkFlow == null){
+            throw new NullPointerException("You cannot submit application of an non-existing user.");
+        }else if(applicationWorkFlow.getStatus().equals("pending")){
+            throw new ResubmitApplicationException("Please wait for hr to review your application. Don't resubmit it.");
+        }else if(applicationWorkFlow.getStatus().equals("approved")){
+            throw new ResubmitApplicationException("Your application has already been approved. Don't resubmit it.");
+        }
+        else{
+            applicationWorkFlowService.updateApplicationStatus(employeeId);
+        }
 
     }
 
 
     @GetMapping("/all/{employeeId}/application")
     public ApplicationWorkFlow getApplicationByEmployeeId(@PathVariable Integer employeeId){
-//        int userId = (int) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-//        if(userId != 1 && userId != employeeId){
-//            throw new CannotAccessOtherUsersDataException("You cannot view the application of other employee.");
-//        }
+        int userId = (int) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if(userId != 1 && userId != employeeId){
+            throw new CannotAccessOtherUsersDataException("You cannot view the application of other employee.");
+        }
 
         ApplicationWorkFlow applicationWorkFlow = applicationWorkFlowService.getApplicationByEmployeeId(employeeId);
         if(applicationWorkFlow == null) System.out.println("null");
@@ -139,26 +152,23 @@ public class ApplicationController {
      */
     @PostMapping("/hr/viewApplication/{employeeId}")
     @PreAuthorize("hasAuthority('hr')")
-    public ResponseEntity<Object> reviewApplication(@PathVariable Integer employeeId, @RequestParam String action, @RequestParam String feedback){
+    public void reviewApplication(@PathVariable Integer employeeId, @RequestParam String action, @RequestParam String feedback){
         ApplicationWorkFlow applicationWorkFlow = applicationWorkFlowService.getApplicationByEmployeeId(employeeId);
         if(action.equals("approve")){
             if(!applicationWorkFlow.getStatus().equals("pending")){
                 throw new approveApplicationFailedException();
             }
             applicationWorkFlowService.approveApplication(applicationWorkFlow.getId());
-            return new ResponseEntity<>("This application has been successfully approved.", HttpStatus.OK);
+
         }else{
             if(!applicationWorkFlow.getStatus().equals("pending")){
                 throw new rejectApplicationFailedException();
             }
-            applicationWorkFlowService.rejectApplication(employeeId, feedback);
-            //send email to employee
-            return new ResponseEntity<>("This application has been successfully rejected.", HttpStatus.OK);
+            applicationWorkFlowService.rejectApplication(applicationWorkFlow.getId(), feedback);
 
         }
 
     }
-
 
     // visa status management part
 
@@ -170,10 +180,10 @@ public class ApplicationController {
     @GetMapping("/employee/{employeeId}/visaStatusManagement")
     @PreAuthorize("hasAuthority('employee')")
     public VisaStatusManagementResponse getVisaStatus(@PathVariable Integer employeeId){
-//        int userId = (int) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-//        if(userId != employeeId){
-//            throw new CannotAccessOtherUsersDataException("You cannot view the visa status management page of other employee.");
-//        }
+        int userId = (int)SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if(userId != employeeId){
+            throw new CannotAccessOtherUsersDataException("You cannot view the visa status management page of other employee.");
+        }
         VisaDocumentStatus visaDocumentStatus = visaDocumentStatusService.getVisaDocumentStatusByEmployeeId(employeeId);
         String status = visaDocumentStatus.getStatus();
         if(status.equals("approved")){
@@ -203,12 +213,14 @@ public class ApplicationController {
     @PostMapping("/employee/{employeeId}/visaStatusManagement")
     @PreAuthorize("hasAuthority('employee')")
     public void submitVisaDocuments(@PathVariable Integer employeeId,
-                                    @RequestParam("fileId") Integer fileId
+                                    @RequestParam("fileId") Integer fileId,
+                                    @RequestParam("url") String url
                                     /* @RequestPart("file") MultipartFile file,
                                     @RequestPart("fileType") String fileType */){
 //        String fileName = digitalDocumentService.uploadFile(file);
 //        digitalDocumentService.updatePersonalDocuments(employeeId, fileName, fileType);
         visaDocumentStatusService.updateVisaDocumentStatus(employeeId, "pending", fileId);
+        visaDocumentStatusService.updateVisaDocumentStatusURL(employeeId, url);
     }
 
 
@@ -238,5 +250,19 @@ public class ApplicationController {
         return null;
     }
 
+    @GetMapping("/hr/pendingVisaDocuments")
+    @PreAuthorize("hasAuthority('hr')")
+    public List<PendingVisaDocumentsResponse> getAllPendingVisaDocuments(){
+        List<VisaDocumentStatus> visaDocumentStatuses = visaDocumentStatusService.getAllPendingVisaDocuments();
+        List<PendingVisaDocumentsResponse> pendingVisaDocumentsResponses = new ArrayList<>();
+        for(VisaDocumentStatus visaDocumentStatus : visaDocumentStatuses){
+            String fileType = visaDocumentStatusService.getDocumentTypeById(visaDocumentStatus.getFileId());
+            pendingVisaDocumentsResponses.add(PendingVisaDocumentsResponse.builder()
+                                                .employeeId(visaDocumentStatus.getEmployeeId())
+                                                .fileType(fileType)
+                                                .path(visaDocumentStatus.getPath()).build());
+        }
+        return pendingVisaDocumentsResponses;
+    }
 
 }
